@@ -255,13 +255,23 @@ svg{display:block;}
   background:#16232b;color:#fff;padding:11px 18px;border-radius:24px;font-size:.82em;text-align:center;
   box-shadow:0 6px 20px rgba(0,0,0,.4);animation:pop .2s;max-width:80%;}
 @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important;}}
+/* ===== video message bubble (bonus lesson) ===== */
+.bub.vid{padding:5px;}
+.vcircle{position:relative;width:170px;height:170px;border-radius:50%;overflow:hidden;cursor:pointer;border:3px solid #00a884;}
+.vcircle svg{width:100%;height:100%;display:block;}
+.vcircle .vtag{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;border-radius:999px;padding:4px 10px;font-size:.68em;white-space:nowrap;}
+.vcircle.live{animation:vpulse 1.6s ease-in-out infinite;}
+.vcircle.sound{border-color:#34b7f1;}
+@keyframes vpulse{50%{box-shadow:0 0 0 7px rgba(0,168,132,.25);}}
+.vpreview{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);width:150px;height:150px;border-radius:50%;overflow:hidden;border:4px solid #ea4335;box-shadow:0 6px 18px rgba(0,0,0,.35);z-index:6;}
+.vpreview svg{width:100%;height:100%;display:block;}
 /* ===== phone/portrait layout: placed last so it overrides the desktop panel rules above ===== */
 .pexp{display:none;margin-left:auto;align-self:center;background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:7px 14px;font-size:.8em;font-weight:600;cursor:pointer;}
 @media (max-aspect-ratio:1/1), (max-width:820px){
   #stage{flex-direction:column;gap:10px;padding:10px;}
   #phoneWrap{order:1;flex:1;min-height:0;}
   #device{width:min(440px,94vw);min-width:0;height:auto;max-height:100%;}
-  #panel{order:2;flex:none;width:100%;max-width:100%;height:auto;max-height:40%;}
+  #panel{order:2;flex:none;width:100%;max-width:100%;height:40%;max-height:40%;}
   .pexp{display:inline-block;}
   .pbrand{margin-bottom:8px;}
   .pcard{padding:12px 14px;}
@@ -272,6 +282,7 @@ svg{display:block;}
   .acts{margin-top:10px;}
   .plede{font-size:.85em;margin:0 0 10px;}
   .ptip{display:none;}
+  #panel:not(.expanded) #coachWait{display:none;}
   #panel.expanded{position:fixed;left:8px;right:8px;top:8px;bottom:8px;width:auto;max-height:none;height:auto;z-index:300;background:var(--deep);border-radius:20px;padding:10px;}
   #panel.expanded .pcard{flex:1;min-height:0;}
   #panel.expanded .step-en{font-size:1.5em;}
@@ -869,6 +880,8 @@ function bubbleHTML(m, ch){
   const name = (!mine && ch.group) ? `<div class="sender">${shortName(m.from)}</div>` : '';
   if(m.type === 'photo')
     return `<div class="bub pic ${mine?'me':'them'}">${name}<div class="photo">${art(m.k)}</div>${meta}</div>`;
+  if(m.type === 'video')
+    return `<div class="bub vid ${mine?'me':'them'}" data-video="1">${name}<div class="vcircle live${m.sound ? ' sound' : ''}">${art(m.k)}<span class="vtag">${m.sound ? (LANG === 'zh' ? '有声音了' : 'Sound on') : (LANG === 'zh' ? '点一下听声音' : 'Tap for sound')}</span></div>${meta}</div>`;
   if(m.type === 'voice')
     return `<div class="bub ${mine?'me':'them'}" data-voice="1">${name}
       <div class="voice"><button class="play">${ico('play')}</button>
@@ -943,7 +956,7 @@ function sendPhoto(k){ push({from:'me', type:'photo', k, t:now()}); Coach.fire('
 function sendVoice(sec){ push({from:'me', type:'voice', dur:Math.max(1,Math.min(9,sec)), t:now()}); Coach.fire('sent:voice'); }
 function syncSendBtn(){
   const has = $('#msgInput').value.trim().length > 0;
-  $('#btnSend').innerHTML = ico(has ? 'send' : 'mic');
+  $('#btnSend').innerHTML = ico(has ? 'send' : (videoMode ? 'videocam' : 'mic'));
   $('#btnSend').dataset.mode = has ? 'send' : 'mic';
 }
 
@@ -1011,6 +1024,7 @@ function backToChat(){ clearInterval(sceneTimer); if(openChat) openChatById(open
 /* ============ hold to record ============ */
 let recStart = 0, recTimer = null;
 function startRec(){
+  if(inVideoLesson()) return vStart();
   if($('#btnSend').dataset.mode === 'send' || recStart) return;
   recStart = Date.now(); $('#btnSend').classList.add('rec');
   const lab = document.createElement('div');
@@ -1022,6 +1036,7 @@ function startRec(){
   }, 400);
 }
 function stopRec(){
+  if(inVideoLesson()) return vStop();
   if(!recStart) return;
   const secs = Math.max(1, Math.round((Date.now()-recStart)/1000));
   recStart = 0; clearInterval(recTimer);
@@ -1308,6 +1323,20 @@ const LESSONS = [
    zh:'名单上只剩下对得上的聊天。点名字就能打开。', target:'chat-susan', on:'open:susan', soft:true},
   {en:'They can now message, send photos and voice notes, call, and search to find anyone.',
    zh:'你已经会发消息、发照片、发语音、打电话，也会用搜索找到任何人了。做得很好！'}
+ ]},
+ { id:'video', title:'Bonus: Send a video message', zhTitle:'加分课：发视频消息',
+   sub:'A short round video', zhSub:'录一小段圆形视频', steps:[
+  {en:'Open a chat first. Tap <b>Ryan</b>.', zh:'先打开一个聊天。点<b>小睿</b>。', target:'chat-ryan', on:'open:ryan'},
+  {en:'Tap the <b>microphone once</b>. Just a quick tap, do not hold. It turns into a camera.',
+   zh:'<b>轻轻点一下</b>麦克风，不要按住。它会变成摄像机。', target:'send', on:'video:mode',
+   whyEn:'Tapped it by accident? Tap once more and it goes back to the microphone.', whyZh:'不小心点到了？再点一下，就变回麦克风。'},
+  {en:'Now <b>press and hold</b> the camera button. Look at the phone and speak.',
+   zh:'现在<b>按住</b>摄像机按钮，看着手机说话。', target:'send', on:'vrec:start'},
+  {en:'<b>Let go</b> and the round video sends by itself.', zh:'讲完就<b>松手</b>，圆形视频会自己发出去。',
+   whyEn:'On a real phone a video message can be up to 60 seconds.', whyZh:'真的手机里，视频消息最长可以录一分钟。', on:'sent:video'},
+  {en:'The video plays quietly on its own. <b>Tap it</b> to hear the sound.', zh:'视频会自己安静地播放。<b>点一下</b>就能听到声音。', target:'.bub.vid', on:'play:video'},
+  {en:'That is a video message. Lovely for birthdays, or to show the grandchildren what you are doing.',
+   zh:'这就是视频消息。很适合祝贺生日，或者让孙子孙女看看你在做什么。'}
  ]}
 ];
 
@@ -1527,6 +1556,69 @@ document.addEventListener('keydown', e => {
     if(document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
   }
+});
+
+/* ============ bonus lesson: video message ============ */
+P.videocam = 'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z';
+var videoMode = false, vDown = 0, vTimer = null;
+function inVideoLesson(){ return !!(Coach.active && LESSONS[Coach.li] && LESSONS[Coach.li].id === 'video'); }
+function vText(zh, en){ return LANG === 'zh' ? zh : en; }
+function resetVideoMode(){
+  videoMode = false; vDown = 0; clearInterval(vTimer);
+  const l = $('#reclabel'); if(l) l.remove();
+  const p = $('#vpreview'); if(p) p.remove();
+  $('#btnSend').classList.remove('rec'); syncSendBtn();
+}
+function vStart(){
+  if($('#btnSend').dataset.mode === 'send' || vDown) return;
+  vDown = Date.now();
+  if(!videoMode) return;
+  $('#btnSend').classList.add('rec');
+  const pv = document.createElement('div'); pv.className = 'vpreview'; pv.id = 'vpreview'; pv.innerHTML = art('family');
+  const lab = document.createElement('div'); lab.className = 'reclabel'; lab.id = 'reclabel';
+  lab.textContent = vText('录视频中… 手指按住不放', 'Recording video… keep holding');
+  $('#scChat').appendChild(pv); $('#scChat').appendChild(lab);
+  Coach.fire('vrec:start');
+  vTimer = setInterval(() => {
+    const s = Math.min(9, Math.floor((Date.now() - vDown) / 1000));
+    lab.textContent = vText(`录视频中 0:0${s} — 松手就发送`, `Recording video 0:0${s} — let go to send`);
+  }, 400);
+}
+function vStop(){
+  if(!vDown) return;
+  const held = Date.now() - vDown; vDown = 0; clearInterval(vTimer);
+  const wasRec = $('#btnSend').classList.contains('rec');
+  $('#btnSend').classList.remove('rec');
+  const l = $('#reclabel'); if(l) l.remove();
+  const p = $('#vpreview'); if(p) p.remove();
+  if(!videoMode){
+    videoMode = true; syncSendBtn();
+    toast(vText('已切换成视频。按住摄像机来录。', 'Switched to video. Hold the camera to record.'));
+    Coach.fire('video:mode'); return;
+  }
+  if(!wasRec) return;
+  if(held < 600){
+    videoMode = false; syncSendBtn();
+    toast(vText('点太快了，变回麦克风。要按住才会录。', 'Only a tap, so it went back to the microphone. Hold to record.'));
+    return;
+  }
+  push({from:'me', type:'video', k:'family', dur:Math.max(1, Math.min(9, Math.round(held / 1000))), t:now()});
+  videoMode = false; syncSendBtn();
+  Coach.fire('sent:video');
+}
+$('#chatScroll').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-video]'); if(!b) return;
+  const c = b.querySelector('.vcircle'); if(!c) return;
+  const on = c.classList.toggle('sound');
+  const vids = openChat ? openChat.msgs.filter(x => x.type === 'video') : [];
+  const mv = vids[[...document.querySelectorAll('[data-video]')].indexOf(b)]; if(mv) mv.sound = on;
+  const tag = c.querySelector('.vtag');
+  if(tag) tag.textContent = on ? vText('有声音了', 'Sound on') : vText('点一下听声音', 'Tap for sound');
+  Coach.fire('play:video');
+});
+['start','stop'].forEach(function(fn){
+  var orig = Coach[fn];
+  Coach[fn] = function(){ resetVideoMode(); return orig.apply(this, arguments); };
 });
 
 /* ============ expand/collapse instruction panel (phone layout) ============ */
